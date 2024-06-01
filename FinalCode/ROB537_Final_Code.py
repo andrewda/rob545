@@ -197,11 +197,13 @@ class Car:
 
     def get_data(self):
         # Get Distances To Border
-        radars_in = self.radars_in
-        return_values = [0, 0, 0, 0, 0, 0, 0]
-        # return_values = numpy.zeros(len(self.radars_in))
-        for i, radar in enumerate(radars_in):
-            return_values[i] = int(radar[1] / 30)  # radar[1] is the distance to the pixel that the sensor is sensing
+        if not self.radars_in:
+            return [0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+        return_values = [int(radar[1] / 30) for radar in self.radars_in]
+        return_values.append(self.speed)
+        return_values.append(0)
+
         return return_values
 
     def is_alive(self):
@@ -258,8 +260,9 @@ class Car:
         return lane_ratio
 
     def get_reward(self, game_map):
-        # Calculate Reward (Maybe Change?)
-        # return self.distance / 50.0
+        # No reward if not moving
+        if self.speed == 0:
+            return 0
 
         # New Reward: Similar to Previous Except with Changed Safe Value and Bonus Value for Lane Ratio
         if self.safe:
@@ -270,7 +273,8 @@ class Car:
         bonus_safe_value = 10
         lane_ratio = self.how_safe(game_map)
 
-        reward = (safe_value + bonus_safe_value*lane_ratio + 0.1*self.speed)/20
+        reward = (safe_value + bonus_safe_value*lane_ratio + (self.speed - 6))/20 + self.distance/100
+
         return reward
 
     def rotate_center(self, image, angle):
@@ -305,7 +309,10 @@ def run_training(genomes, config):
     generation_font = pygame.font.SysFont("Arial", 30)
     alive_font = pygame.font.SysFont("Arial", 20)
     # game_map = pygame.image.load('testing_track3.png').convert()  # Convert Speeds Up A Lot
-    global tmap
+    # global tmap
+
+    # random number between 0 and len(maps)
+    tmap = np.random.choice(maps)
     game_map = pygame.image.load(tmap).convert()  # Convert Speeds Up A Lot
 
     global current_generation
@@ -325,11 +332,22 @@ def run_training(genomes, config):
         for i, car in enumerate(cars):
             output = nets[i].activate(car.get_data())
 
-            car.angle += (output[0] - 0.5) * 2 * 7
-            car.speed += (output[1] - 0.5) * 2 * 0.1
+            delta_angle = (output[0] - 0.5) * 2 * 7
+            delta_speed = (output[1] - 0.5) * 2 * 0.1
 
-            # Bound speed between 12 and 8
-            car.speed = np.clip(car.speed, 8, 12)
+            # Apply skidding, scaled based on speed and turning speed
+            if delta_angle != 0 and car.speed > 6:
+                angle_scalar = delta_angle / 7
+
+                # Apply skidding in the current direction of motion
+                car.position[0] += math.cos(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
+                car.position[1] += math.sin(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
+
+            car.angle += delta_angle
+            car.speed += delta_speed
+
+            # Bound speed between 4 and 12
+            car.speed = np.clip(car.speed, 4, 12)
 
 
         # Check If Car Is Still Alive
@@ -345,7 +363,7 @@ def run_training(genomes, config):
             break
 
         counter += 1
-        if counter == 30 * 40:  # Stop After About 20 Seconds
+        if counter == 60 * 10:  # Stop After About 10 Seconds
             break
 
         # Draw Map And All Cars That Are Alive
@@ -449,15 +467,24 @@ def run_testing(genomes, config, map):
         # For Each Car Get The Acton It Takes
         for i, car in enumerate(cars):
             output = nets[i].activate(car.get_data())
-            choice = output.index(max(output))
 
-            car.angle += (output[0] - 0.5) * 2 * 7
-            car.speed += (output[1] - 0.5) * 2 * 0.1
+            delta_angle = (output[0] - 0.5) * 2 * 7
+            delta_speed = (output[1] - 0.5) * 2 * 0.1
 
-            # Bound speed between 12 and 8
-            car.speed = np.clip(car.speed, 8, 12)
+            # Apply skidding, scaled based on speed and turning speed
+            if delta_angle != 0 and car.speed > 6:
+                angle_scalar = delta_angle / 7
 
-            # Original choice 0: left, 1: Right, 2: Slow Down, 3: Speed up, 4: No Change
+                # Apply skidding in the current direction of motion
+                car.position[0] += math.cos(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
+                car.position[1] += math.sin(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
+
+            car.angle += delta_angle
+            car.speed += delta_speed
+
+            # Bound speed between 4 and 12
+            car.speed = np.clip(car.speed, 4, 12)
+
         speedPerTimeStep[t] = car.speed
         distPerTimeStep[t] = car.distance
         t=t+1
@@ -476,7 +503,7 @@ def run_testing(genomes, config, map):
             break
 
         counter += 1
-        if counter == 30 * 40:  # Stop After About 20 Seconds
+        if counter == 60 * 10:  # Stop After About 10 Seconds
             error_count = car.total_error_count
             total_count = car.total_state_count
             safe_count = total_count - error_count
@@ -572,7 +599,7 @@ if __name__ == "__main__":
     global tmap
 
     #Setup Variables
-    gen_count = 40
+    gen_count = 10
     n = 5
     train_map_idx = 3
     eval_map_idx = 1
