@@ -1,8 +1,3 @@
-# The basis of this code is heavily inspired by the NeuralNine (Florian Dedov)
-# Code functionality was modified, and expanded by Mark-Robin Giolando and Jonathan Turcic
-
-
-
 import math
 import sys
 import time
@@ -56,9 +51,8 @@ class Car:
         self.angle = 0
         self.speed = 0
 
-        self.steer_delta = 7  # BEST = 7
-        self.speed_up_delta = 0.1
-        self.slow_down_delta = 2
+        self.max_angular_acceleration = 0.1
+        self.max_acceleration = 0.1
 
         self.stability_track = []
 
@@ -330,32 +324,12 @@ def run_training(genomes, config):
 
         for i, car in enumerate(cars):
             output = nets[i].activate(car.get_data())
-            choice = output.index(max(output))
 
-            # Testing
-            steer_delta = int(car.steer_delta)
-            speed_up_delta = float(car.speed_up_delta)
-            slow_down_delta = int(car.slow_down_delta)
-
-            # Five options for action: Left, Right, Speed Up, Slow Down, and Maintain Speed and Heading
-            if choice == 0:  # Left
-                car.angle -= steer_delta
-            elif choice == 1:
-                car.angle += steer_delta  # Right
-            elif choice == 2:  # Speed Up
-                car.speed += speed_up_delta
-            elif choice == 3:  # Right and Speed Up
-                car.speed -= slow_down_delta
-            elif choice == 4:  # Maintain Speed and Heading
-                car.speed = car.speed + 0
-                car.angle = car.angle + 0
+            car.angle += (output[0] - 0.5) * 2 * 7
+            car.speed += (output[1] - 0.5) * 2 * 0.1
 
             # Bound speed between 12 and 8
-            if car.speed > 12:
-                car.speed = 12
-
-            if car.speed < 8:
-                car.speed = 8
+            car.speed = np.clip(car.speed, 8, 12)
 
 
         # Check If Car Is Still Alive
@@ -462,7 +436,7 @@ def run_testing(genomes, config, map):
     speedPerTimeStep = np.zeros([1, 1200])[0]
     distPerTimeStep = np.zeros([1, 1200])[0]
     safetyRatPerTimeStep = np.zeros([1, 1200])[0]
-    
+
     # Simple Counter To Roughly Limit Time (Not Good Practice)
     counter = 0
     t=0
@@ -477,32 +451,11 @@ def run_testing(genomes, config, map):
             output = nets[i].activate(car.get_data())
             choice = output.index(max(output))
 
-            # Testing
-            steer_delta = int(car.steer_delta)
-            speed_up_delta = float(car.speed_up_delta)
-            slow_down_delta = int(car.slow_down_delta)
+            car.angle += (output[0] - 0.5) * 2 * 7
+            car.speed += (output[1] - 0.5) * 2 * 0.1
 
-            if choice == 0:  # Left and Slow Down
-                car.angle -= steer_delta
-                car.speed -= slow_down_delta
-            elif choice == 1:
-                car.angle += steer_delta  # Right and Slow Down
-                car.speed -= slow_down_delta
-            elif choice == 2:  # Left and Speed Up
-                car.angle -= steer_delta
-                car.speed += speed_up_delta
-            elif choice == 3:  # Right and Speed Up
-                car.angle += steer_delta
-                car.speed += speed_up_delta
-            elif choice == 4:  # Maintain Speed and Heading
-                car.speed = car.speed + 0
-                car.angle = car.angle + 0
-
-            if car.speed > 12:
-                car.speed = 12
-
-            if car.speed < 8:
-                car.speed = 8
+            # Bound speed between 12 and 8
+            car.speed = np.clip(car.speed, 8, 12)
 
             # Original choice 0: left, 1: Right, 2: Slow Down, 3: Speed up, 4: No Change
         speedPerTimeStep[t] = car.speed
