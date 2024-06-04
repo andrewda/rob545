@@ -152,6 +152,11 @@ class Car:
         self.position[0] = max(self.position[0], 20)
         self.position[0] = min(self.position[0], WIDTH - 120)
 
+        # Same For Y-Position
+        self.position[1] += math.sin(math.radians(360 - self.angle)) * self.speed
+        self.position[1] = max(self.position[1], 20)
+        self.position[1] = min(self.position[1], WIDTH - 120)
+
         # Increase Distance and Time
         self.distance += self.speed
         self.time += 1
@@ -163,11 +168,6 @@ class Car:
             self.safe_time = self.safe_time/1.2
             self.total_error_count = self.total_error_count + 1
             self.total_state_count = self.total_state_count + 1
-
-        # Same For Y-Position
-        self.position[1] += math.sin(math.radians(360 - self.angle)) * self.speed
-        self.position[1] = max(self.position[1], 20)
-        self.position[1] = min(self.position[1], WIDTH - 120)
 
         # Calculate New Center
         self.center = [int(self.position[0]) + CAR_SIZE_X / 2, int(self.position[1]) + CAR_SIZE_Y / 2]
@@ -309,10 +309,10 @@ def run_training(genomes, config):
     generation_font = pygame.font.SysFont("Arial", 30)
     alive_font = pygame.font.SysFont("Arial", 20)
     # game_map = pygame.image.load('testing_track3.png').convert()  # Convert Speeds Up A Lot
-    # global tmap
+    global tmap
 
     # random number between 0 and len(maps)
-    tmap = np.random.choice(maps)
+    # tmap = np.random.choice(maps)
     game_map = pygame.image.load(tmap).convert()  # Convert Speeds Up A Lot
 
     global current_generation
@@ -335,15 +335,14 @@ def run_training(genomes, config):
             delta_angle = (output[0] - 0.5) * 2 * 7
             delta_speed = (output[1] - 0.5) * 2 * 0.1
 
-            # Apply skidding, scaled based on speed and turning speed
-            if delta_angle != 0 and car.speed > 6:
-                angle_scalar = delta_angle / 7
+            # Adjust the turning angle based on speed to simulate skidding
+            # The faster the car is, the less effective the steering should be
+            # If the car is in the safe zone, the skid factor is reduced
+            max_reduction = 0.4 if car.safe else 0.8
+            skid_factor = 1 - np.clip((car.speed - 6) / 6, 0, 1) * max_reduction
+            adjusted_delta_angle = delta_angle * skid_factor
 
-                # Apply skidding in the current direction of motion
-                car.position[0] += math.cos(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
-                car.position[1] += math.sin(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
-
-            car.angle += delta_angle
+            car.angle += adjusted_delta_angle
             car.speed += delta_speed
 
             # Bound speed between 4 and 12
@@ -363,7 +362,7 @@ def run_training(genomes, config):
             break
 
         counter += 1
-        if counter == 60 * 10:  # Stop After About 10 Seconds
+        if counter == 30 * 40:  # Stop After About 20 Seconds
             break
 
         # Draw Map And All Cars That Are Alive
@@ -471,15 +470,14 @@ def run_testing(genomes, config, map):
             delta_angle = (output[0] - 0.5) * 2 * 7
             delta_speed = (output[1] - 0.5) * 2 * 0.1
 
-            # Apply skidding, scaled based on speed and turning speed
-            if delta_angle != 0 and car.speed > 6:
-                angle_scalar = delta_angle / 7
+            # Adjust the turning angle based on speed to simulate skidding
+            # The faster the car is, the less effective the steering should be
+            # If the car is in the safe zone, the skid factor is reduced
+            max_reduction = 0.4 if car.safe else 0.8
+            skid_factor = 1 - np.clip((car.speed - 6) / 6, 0, 1) * max_reduction
+            adjusted_delta_angle = delta_angle * skid_factor
 
-                # Apply skidding in the current direction of motion
-                car.position[0] += math.cos(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
-                car.position[1] += math.sin(math.radians(360 - car.angle)) * car.speed * angle_scalar / 10
-
-            car.angle += delta_angle
+            car.angle += adjusted_delta_angle
             car.speed += delta_speed
 
             # Bound speed between 4 and 12
@@ -503,7 +501,7 @@ def run_testing(genomes, config, map):
             break
 
         counter += 1
-        if counter == 60 * 10:  # Stop After About 10 Seconds
+        if counter == 30 * 40:  # Stop After About 20 Seconds
             error_count = car.total_error_count
             total_count = car.total_state_count
             safe_count = total_count - error_count
@@ -599,7 +597,7 @@ if __name__ == "__main__":
     global tmap
 
     #Setup Variables
-    gen_count = 10
+    gen_count = 3
     n = 5
     train_map_idx = 3
     eval_map_idx = 1
@@ -609,13 +607,7 @@ if __name__ == "__main__":
     potentialWhatToRunCmds = ['all', '1train4test', 'survivorgraph', 'DistancesAndGreenRatio', 'resultsTrainedBy1']
     whattorun = ['trainingGraphs', 'crossVerificationGraphs']
 
-    gs = [10, 30, 50, 60, 70, 80, 90, 100, 120]
-    gs = [1, 3, 5, 8, 10, 12, 15, 17, 20]
     gs = [gen_count]
-
-    training_gs = [10, 15, 20]
-    training_gs = [10, 15, 20, 25, 30, 40, 45, 50]
-    # training_gs = [1]
 
     #Data collection Data Structures
     distances = np.zeros((len(maps), len(gs)))
@@ -745,7 +737,6 @@ if __name__ == "__main__":
     #TODO: Add code for capturing safty ratio
     if ('all' in whattorun) or ('deepDiveGraphs' in whattorun):
         # genome_path = "Winner3.pkl"
-        print(tmap)
         deepSpeed = np.zeros([len(maps), 1200])
         deepLaneSafety = np.zeros([len(maps), 1200])
         deepDistances = np.zeros((len(maps), 1200))
