@@ -383,7 +383,7 @@ def run_training(genomes, config):
         screen.blit(text, text_rect)
 
         pygame.display.flip()
-        clock.tick(60)  # 60 FPS
+        clock.tick(600)  # 60 FPS
 
     global survPerGen
     global gen_i
@@ -549,7 +549,7 @@ def run_testing(genomes, config, map):
         screen.blit(text, text_rect)
 
         pygame.display.flip()
-        clock.tick(50)  # 60 FPS
+        clock.tick(60)  # 60 FPS
 
     survived = cars[0].is_alive()
     percent_on_green = st_sr
@@ -597,7 +597,7 @@ if __name__ == "__main__":
     global tmap
 
     #Setup Variables
-    gen_count = 3
+    gen_count = 40
     n = 5
     train_map_idx = 3
     eval_map_idx = 1
