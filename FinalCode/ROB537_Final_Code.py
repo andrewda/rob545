@@ -273,7 +273,7 @@ class Car:
         bonus_safe_value = 10
         lane_ratio = self.how_safe(game_map)
 
-        reward = (safe_value + bonus_safe_value*lane_ratio + (self.speed - 6))/20 + self.distance/100
+        reward = (safe_value + bonus_safe_value*lane_ratio + (self.speed - 6))/20 # + self.distance/100
 
         return reward
 
