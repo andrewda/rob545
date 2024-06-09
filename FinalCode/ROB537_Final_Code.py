@@ -7,6 +7,7 @@ import pygame
 import pickle
 
 import numpy as np
+import pandas as pd
 
 
 import pandas as pd
@@ -198,11 +199,12 @@ class Car:
     def get_data(self):
         # Get Distances To Border
         if not self.radars_in:
-            return [0, 0, 0, 0, 0, 0, 0, 0, 0]
+            # return [0, 0, 0, 0, 0, 0, 0, 0, 0]
+            return [0, 0, 0, 0, 0, 0, 0, 0]
 
         return_values = [int(radar[1] / 30) for radar in self.radars_in]
         return_values.append(self.speed)
-        return_values.append(0)
+        # return_values.append(0)
 
         return return_values
 
@@ -273,7 +275,7 @@ class Car:
         bonus_safe_value = 10
         lane_ratio = self.how_safe(game_map)
 
-        reward = (safe_value + bonus_safe_value*lane_ratio + (self.speed - 6))/20 # + self.distance/100
+        reward = (safe_value + bonus_safe_value*lane_ratio + (self.speed - 6))/20 + self.distance/1000
 
         return reward
 
@@ -383,7 +385,8 @@ def run_training(genomes, config):
         screen.blit(text, text_rect)
 
         pygame.display.flip()
-        clock.tick(600)  # 60 FPS
+
+        clock.tick(60)  # 60 FPS
 
     global survPerGen
     global gen_i
@@ -631,6 +634,14 @@ if __name__ == "__main__":
                 print()
         survivors = [[x / n for x in subl] for subl in survivors]
         mapdistPerGen = [[x / n for x in subl] for subl in mapdistPerGen]
+
+
+        # Save data to CSV
+        df = pd.DataFrame(survivors)
+        df.to_csv('survivors.csv', index=False)
+
+        df = pd.DataFrame(mapdistPerGen)
+        df.to_csv('mapdistPerGen.csv', index=False)
 
 
         for k in range(0, len(maps)):
